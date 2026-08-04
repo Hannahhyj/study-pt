@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
+    <title>四年级学习平台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ========== 侧边导航 ========== -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-logo">📚 学习平台</div>
+        <div class="menu-group">
+            <div class="menu-group-title">主菜单</div>
+            <div class="menu-item active" data-page="page-home">
+                <span class="icon">🏠</span><span>首页</span>
+            </div>
+        </div>
+        <div class="menu-group">
+            <div class="menu-group-title">学科</div>
+            <div class="menu-item" data-page="page-chinese">
+                <span class="icon">📝</span><span>语文</span>
+            </div>
+            <div class="menu-item" data-page="page-math">
+                <span class="icon">🔢</span><span>数学</span>
+            </div>
+            <div class="menu-item" data-page="page-english">
+                <span class="icon">📖</span><span>英语</span>
+            </div>
+        </div>
+        <div class="menu-group">
+            <div class="menu-group-title">拓展</div>
+            <div class="menu-item" data-page="page-sentence">
+                <span class="icon">✨</span><span>每日句子</span>
+            </div>
+            <div class="menu-item" data-page="page-words">
+                <span class="icon">🔤</span><span>单词背诵</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 移动端菜单切换按钮 -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
+
+    <!-- ========== 主内容区 ========== -->
+    <main class="main" id="main">
+        <!-- 页面1：首页 -->
+        <section id="page-home" class="page active">
+            <h2 class="page-title"><span class="accent"></span>今日学习</h2>
+            <div class="welcome-banner">
+                <div class="welcome-text">
+                    <h3>你好，温梓妍！👋</h3>
+                    <p>今天是 <span id="todayDate"></span>，让我们开始今天的学习吧！</p>
+                </div>
+            </div>
+            <div class="subject-cards">
+                <div class="subject-card" data-goto="page-chinese">
+                    <div class="subject-icon" style="background:#fef3c7;">📝</div>
+                    <h3>语文</h3>
+                    <p>8单元 · 27课</p>
+                    <p class="desc">生字默写 · 重点讲解 · 仿写造句</p>
+                </div>
+                <div class="subject-card" data-goto="page-math">
+                    <div class="subject-icon" style="background:#dbeafe;">🔢</div>
+                    <h3>数学</h3>
+                    <p>6单元</p>
+                    <p class="desc">知识汇总 · 拔高拓展</p>
+                </div>
+                <div class="subject-card" data-goto="page-english">
+                    <div class="subject-icon" style="background:#dcfce7;">📖</div>
+                    <h3>英语</h3>
+                    <p>Starter + 10 Units</p>
+                    <p class="desc">知识汇总 · 重点语句 · 语法</p>
+                </div>
+            </div>
+            <div class="task-section">
+                <h3 class="section-title">📋 今日任务</h3>
+                <div class="task-stats" id="task-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#dbeafe;">📋</div>
+                        <div class="stat-info"><div class="num" id="stat-total">0</div><div class="label">总任务</div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#d1fae5;">✅</div>
+                        <div class="stat-info"><div class="num" id="stat-done">0</div><div class="label">已完成</div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#fef3c7;">⏳</div>
+                        <div class="stat-info"><div class="num" id="stat-pending">0</div><div class="label">待完成</div></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="task-add">
+                        <select id="task-subject">
+                            <option value="语文">语文</option>
+                            <option value="数学">数学</option>
+                            <option value="英语">英语</option>
+                            <option value="其他">其他</option>
+                        </select>
+                        <input type="text" id="task-text" placeholder="输入任务内容，按回车快速添加">
+                        <button class="btn btn-primary" id="add-task">＋ 新增</button>
+                    </div>
+                    <div id="task-list" class="task-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页面2：语文 -->
+        <section id="page-chinese" class="page">
+            <h2 class="page-title"><span class="accent"></span>语文 · 四年级上册</h2>
+            <!-- 语文子标签 -->
+            <div class="sub-tabs">
+                <button class="sub-tab active" data-chinese-tab="tab-chars">✍️ 生字词默写</button>
+                <button class="sub-tab" data-chinese-tab="tab-points">📚 重点讲解</button>
+                <button class="sub-tab" data-chinese-tab="tab-sentences">✨ 仿写造句</button>
+            </div>
+            <div class="sub-content">
+                <!-- 语文子标签1：生字词 -->
+                <div id="tab-chars" class="sub-pane active">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="chinese-unit-chars"></select>
+                        <button class="btn btn-success" id="btn-print-chars">🖨️ 打印默写纸</button>
+                    </div>
+                    <div id="chinese-chars-display"></div>
+                </div>
+                <!-- 语文子标签2：重点讲解 -->
+                <div id="tab-points" class="sub-pane">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="chinese-unit-points"></select>
+                    </div>
+                    <div id="chinese-points-display"></div>
+                </div>
+                <!-- 语文子标签3：仿写造句 -->
+                <div id="tab-sentences" class="sub-pane">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="chinese-unit-sentences"></select>
+                    </div>
+                    <div id="chinese-sentences-display"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页面3：数学 -->
+        <section id="page-math" class="page">
+            <h2 class="page-title"><span class="accent"></span>数学 · 四年级上册</h2>
+            <div class="sub-tabs">
+                <button class="sub-tab active" data-math-tab="tab-summary">📖 知识汇总</button>
+                <button class="sub-tab" data-math-tab="tab-extension">🚀 拔高拓展</button>
+            </div>
+            <div class="sub-content">
+                <div id="tab-summary" class="sub-pane active">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="math-unit-summary"></select>
+                    </div>
+                    <div id="math-summary-display"></div>
+                </div>
+                <div id="tab-extension" class="sub-pane">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="math-unit-extension"></select>
+                    </div>
+                    <div id="math-extension-display"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页面4：英语 -->
+        <section id="page-english" class="page">
+            <h2 class="page-title"><span class="accent"></span>英语 · 四年级上册</h2>
+            <div class="sub-tabs">
+                <button class="sub-tab active" data-english-tab="tab-en-summary">📖 知识汇总</button>
+                <button class="sub-tab" data-english-tab="tab-en-sentences">💬 重点语句</button>
+                <button class="sub-tab" data-english-tab="tab-en-grammar">📐 语法讲解</button>
+            </div>
+            <div class="sub-content">
+                <div id="tab-en-summary" class="sub-pane active">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="english-unit-summary"></select>
+                    </div>
+                    <div id="english-summary-display"></div>
+                </div>
+                <div id="tab-en-sentences" class="sub-pane">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="english-unit-sentences"></select>
+                    </div>
+                    <div id="english-sentences-display"></div>
+                </div>
+                <div id="tab-en-grammar" class="sub-pane">
+                    <div class="unit-selector">
+                        <label>选择单元：</label>
+                        <select id="english-unit-grammar"></select>
+                    </div>
+                    <div id="english-grammar-display"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页面5：每日句子 -->
+        <section id="page-sentence" class="page">
+            <h2 class="page-title"><span class="accent"></span>每日优美句子</h2>
+            <div class="sentence-module" id="sentenceModule">
+                <div class="date-info" id="dateInfo"></div>
+                <div id="sentenceBox"></div>
+                <div class="good-words-section">
+                    <div class="good-words-title">📝 今日推荐好词</div>
+                    <div id="wordBox"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页面6：单词背诵 -->
+        <section id="page-words" class="page">
+            <h2 class="page-title"><span class="accent"></span>英语单词背诵</h2>
+            <div class="card">
+                <div class="word-header">
+                    <label style="font-weight:600;">选择单元：</label>
+                    <select id="unit-select-words"></select>
+                    <button class="btn btn-primary" id="start-study">开始背诵</button>
+                </div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+            <div id="word-area">
+                <div class="empty-state">
+                    <div class="emoji">📖</div>
+                    <div class="text">选择单元并点击「开始背诵」</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ========== 打印默写纸模态框 ========== -->
+    <div class="modal-overlay" id="printModal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📄 生字默写纸</h3>
+                <button class="modal-close" id="closePrintModal">✕</button>
+            </div>
+            <div class="modal-body" id="printContent"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="window.print()">🖨️ 打印</button>
+                <button class="btn btn-ghost" id="closePrintModal2">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- ========== 数据文件 ========== -->
+    <script src="data/word-data.js"></script>
+    <script src="data/chinese-data.js"></script>
+    <script src="data/math-data.js"></script>
+    <script src="data/english-data.js"></script>
+
+    <!-- ========== 主逻辑 ========== -->
+    <script src="app.js"></script>
+</body>
+</html>
