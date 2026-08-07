@@ -445,6 +445,7 @@ function renderSentenceModule() {
  * 单词背诵
  * ================================================================ */
 const nce1Data = (typeof window.nce1Data !== 'undefined') ? window.nce1Data : [];
+const primary1000Data = (typeof window.primary1000Data !== 'undefined') ? window.primary1000Data : [];
 const wordData = (typeof window.wordData !== 'undefined') ? window.wordData : [];
 
 // 当前教材数据集
@@ -452,6 +453,7 @@ function getCurrentWordBook() {
     const bookSel = document.getElementById('book-select-words');
     const book = bookSel ? bookSel.value : 'textbook';
     if (book === 'nce1' && nce1Data.length) return nce1Data;
+    if (book === 'primary1000' && primary1000Data.length) return primary1000Data;
     return wordData;
 }
 
