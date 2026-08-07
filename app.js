@@ -444,69 +444,134 @@ function renderSentenceModule() {
 /* ================================================================
  * 单词背诵
  * ================================================================ */
+const nce1Data = (typeof window.nce1Data !== 'undefined') ? window.nce1Data : [];
 const wordData = (typeof window.wordData !== 'undefined') ? window.wordData : [];
 
-// 填充单词单元选择
-(function fillWordUnits() {
+// 当前教材数据集
+function getCurrentWordBook() {
+    const bookSel = document.getElementById('book-select-words');
+    const book = bookSel ? bookSel.value : 'textbook';
+    if (book === 'nce1' && nce1Data.length) return nce1Data;
+    return wordData;
+}
+
+// 根据教材填充单元下拉
+function fillWordUnits() {
     const sel = document.getElementById('unit-select-words');
-    if (!sel || !wordData || !wordData.length) {
-        if (sel) sel.innerHTML = '<option value="">暂无数据</option>';
+    if (!sel) return;
+    const data = getCurrentWordBook();
+    if (!data || !data.length) {
+        sel.innerHTML = '<option value="">暂无数据</option>';
         return;
     }
-    const units = [...new Set(wordData.map(w => w.unit))];
+    const units = [...new Set(data.map(w => w.unit))];
     sel.innerHTML = units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
-})();
+}
 
-let waitList = [], writeList = [], currentWord = null, studyMode = 'read', writeIndex = 0, totalWords = 0;
+// 初始化填充
+fillWordUnits();
+
+// 教材切换时重新填充单元
+document.getElementById('book-select-words')?.addEventListener('change', fillWordUnits);
+
+let studyList = [],      // 当前单元全部单词（原始顺序，用于预览）
+    readQueue = [],      // 背诵队列（随机打乱）
+    writeList = [],      // 默写队列
+    currentWord = null,
+    studyMode = 'idle',  // idle | preview | read | write
+    writeIndex = 0,
+    totalWords = 0,
+    answerChecked = false; // 默写时是否已核对过当前题
 
 function updateProgress(current, total) {
     const pct = total > 0 ? (current / total) * 100 : 0;
     document.getElementById('progressBar').style.width = pct + '%';
 }
 
+/* ---- 选择单元后先预览全部单词 ---- */
+document.getElementById('book-select-words')?.addEventListener('change', renderWordPreview);
+document.getElementById('unit-select-words')?.addEventListener('change', renderWordPreview);
+
+function renderWordPreview() {
+    if (studyMode === 'read' || studyMode === 'write') return; // 背诵进行中不刷新
+    const selUnit = document.getElementById('unit-select-words').value;
+    const currentData = getCurrentWordBook();
+    studyList = currentData.filter(w => w.unit === selUnit);
+    const area = document.getElementById('word-area');
+    if (studyList.length === 0) {
+        area.innerHTML = '<div class="empty-state"><div class="emoji">📖</div><div class="text">该单元暂无单词</div></div>';
+        return;
+    }
+    studyMode = 'preview';
+    updateProgress(0, studyList.length);
+    area.innerHTML = `
+        <div class="word-preview-bar">
+            <span>📋 本单元共 <strong>${studyList.length}</strong> 个单词，点击「开始背诵」进入随机复习 + 默写</span>
+        </div>
+        <div class="word-preview-grid">
+            ${studyList.map(w => `
+                <div class="word-preview-card">
+                    <div class="wpv-word">${esc(w.word)}</div>
+                    <div class="wpv-phonetic">${esc(w.phonetic || '')}</div>
+                    <div class="wpv-pos">${esc(w.pos || '')}</div>
+                    <div class="wpv-meaning">${esc(w.meaning || '')}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+/* ---- 开始背诵 ---- */
 document.getElementById('start-study')?.addEventListener('click', function() {
     const selUnit = document.getElementById('unit-select-words').value;
-    waitList = wordData.filter(w => w.unit === selUnit);
-    waitList.sort(() => Math.random() - 0.5);
-    writeList = [...waitList];
-    if (waitList.length === 0) { showToast('该单元暂无单词数据'); return; }
-    totalWords = waitList.length;
+    const currentData = getCurrentWordBook();
+    studyList = currentData.filter(w => w.unit === selUnit);
+    if (studyList.length === 0) { showToast('该单元暂无单词数据'); return; }
+
+    readQueue = [...studyList].sort(() => Math.random() - 0.5);
+    writeList = [...studyList].sort(() => Math.random() - 0.5);
+    totalWords = studyList.length;
     studyMode = 'read';
     writeIndex = 0;
+    answerChecked = false;
     showNextWord();
 });
 
+/* ---- 背诵阶段：随机逐个展示 ---- */
 function showNextWord() {
     if (studyMode !== 'read') return;
-    if (waitList.length === 0) {
+    if (readQueue.length === 0) {
         studyMode = 'write';
         writeIndex = 0;
-        showToast('✅ 背诵完成！进入默写模式', 2500);
+        answerChecked = false;
+        showToast('✅ 复习完成！进入默写模式', 2500);
         showWriteWord();
         return;
     }
-    const studied = totalWords - waitList.length;
+    const studied = totalWords - readQueue.length;
     updateProgress(studied, totalWords);
-    currentWord = waitList[0];
+    currentWord = readQueue[0];
     const pos = currentWord.pos || '';
     document.getElementById('word-area').innerHTML = `
         <div class="word-card">
+            <div class="read-progress-tag">📖 复习 ${studied + 1} / ${totalWords}</div>
             <div class="word-title">${esc(currentWord.word)}</div>
             <div class="phonetic">${esc(currentWord.phonetic || '')}</div>
             ${pos ? `<span class="pos">${esc(pos)}</span>` : ''}
             <div class="meaning">${esc(currentWord.meaning || '')}</div>
             <div class="btn-group">
                 <button class="btn btn-primary" id="btn-audio">🔊 朗读</button>
-                <button class="btn btn-success" id="btn-know">✓ 认识</button>
-                <button class="btn btn-warning" id="btn-unknow">↻ 不认识</button>
+                <button class="btn btn-success" id="btn-know">✓ 认识，下一个</button>
+                <button class="btn btn-warning" id="btn-unknow">↻ 不认识，再来</button>
             </div>
         </div>
     `;
     document.getElementById('btn-audio').addEventListener('click', () => speakText(currentWord.word, 'en-GB'));
-    document.getElementById('btn-know').addEventListener('click', () => { waitList.shift(); showNextWord(); });
-    document.getElementById('btn-unknow').addEventListener('click', () => { const w = waitList.shift(); waitList.push(w); showNextWord(); });
+    document.getElementById('btn-know').addEventListener('click', () => { readQueue.shift(); showNextWord(); });
+    document.getElementById('btn-unknow').addEventListener('click', () => { const w = readQueue.shift(); readQueue.push(w); showNextWord(); });
 }
 
+/* ---- 默写阶段 ---- */
 function showWriteWord() {
     if (writeIndex >= writeList.length) {
         updateProgress(totalWords, totalWords);
@@ -514,44 +579,212 @@ function showWriteWord() {
             <div class="word-card">
                 <div style="font-size:48px;margin-bottom:16px;">🎉</div>
                 <h3 style="font-size:22px;color:#10b981;">本单元默写全部完成！</h3>
-                <p style="color:#6b7280;margin-top:8px;">继续加油，你很棒！</p>
+                <p style="color:#6b7280;margin-top:8px;">错词已自动记录到下方「错词记录」表格</p>
+                <button class="btn btn-primary" style="margin-top:20px;" id="btn-back-preview">↩ 返回单词列表</button>
             </div>
         `;
+        document.getElementById('btn-back-preview')?.addEventListener('click', () => {
+            studyMode = 'preview';
+            renderWordPreview();
+        });
+        renderWrongRecordTable();
         return;
     }
     updateProgress(writeIndex, writeList.length);
     currentWord = writeList[writeIndex];
+    answerChecked = false;
     document.getElementById('word-area').innerHTML = `
         <div class="word-card write-card">
             <h3>✍️ 汉译英默写（${writeIndex + 1} / ${writeList.length}）</h3>
             <p class="meaning-prompt">${esc(currentWord.meaning)}</p>
             <div class="write-box">
-                <input type="text" class="answer-input" id="ans-input" placeholder="请输入英文单词或短语" autocomplete="off">
+                <input type="text" class="answer-input" id="ans-input" placeholder="输入英文单词或短语，按 Enter 核对，再按 Enter 到下一题" autocomplete="off" autocapitalize="off">
             </div>
             <div class="btn-group" style="margin-top:20px;">
                 <button class="btn btn-primary" id="btn-check">核对答案</button>
                 <button class="btn btn-ghost" id="btn-skip">下一题 →</button>
             </div>
             <div class="check-tip" id="check-tip"></div>
+            <div class="enter-hint" id="enter-hint"></div>
         </div>
     `;
-    document.getElementById('ans-input').focus();
-    document.getElementById('ans-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkAnswer(); });
+    const input = document.getElementById('ans-input');
+    input.focus();
+    // Enter：第一次核对，第二次跳下一题
+    input.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (!answerChecked) {
+            checkAnswer();
+        } else {
+            writeIndex++;
+            showWriteWord();
+        }
+    });
     document.getElementById('btn-check').addEventListener('click', checkAnswer);
-    document.getElementById('btn-skip').addEventListener('click', () => { writeIndex++; showWriteWord(); });
+    document.getElementById('btn-skip').addEventListener('click', () => {
+        // 跳过也算错误，记录跳过未答的词
+        if (!answerChecked) {
+            saveWrongRecord(currentWord.word, '(未作答)');
+        }
+        writeIndex++;
+        showWriteWord();
+    });
 }
 
 function checkAnswer() {
-    const input = document.getElementById('ans-input').value.trim().toLowerCase();
-    const ans = currentWord.word.toLowerCase();
+    const inputEl = document.getElementById('ans-input');
+    const input = inputEl.value.trim();
+    const ans = currentWord.word;
     const tip = document.getElementById('check-tip');
+    const hint = document.getElementById('enter-hint');
     if (!input) { showToast('请先输入答案'); return; }
-    if (input === ans) {
+
+    answerChecked = true;
+    if (input.toLowerCase() === ans.toLowerCase()) {
         tip.className = 'check-tip correct';
         tip.textContent = '✅ 回答正确！';
+        hint.textContent = '按 Enter 继续下一题';
         speakText(currentWord.word, 'en-GB');
     } else {
         tip.className = 'check-tip wrong';
-        tip.textContent = `❌ 错误！正确答案：${currentWord.word}`;
+        tip.textContent = `❌ 错误！正确答案：${ans}`;
+        hint.textContent = '按 Enter 继续下一题';
+        // 记录错词
+        saveWrongRecord(ans, input);
     }
 }
+
+/* ---- 错词记录（localStorage 持久化） ---- */
+function getWrongRecords() {
+    return JSON.parse(localStorage.getItem('wrongWordRecords') || '[]');
+}
+
+function saveWrongRecord(correctWord, userInput) {
+    const records = getWrongRecords();
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const dateTime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const selUnit = document.getElementById('unit-select-words').value;
+    const bookSel = document.getElementById('book-select-words');
+    const bookName = bookSel ? bookSel.options[bookSel.selectedIndex].text : '';
+
+    // 如果同一个单词已经错过，累加错误次数并更新日期/输入
+    const existing = records.find(r => r.correctWord === correctWord && r.unit === selUnit && r.book === bookName);
+    if (existing) {
+        existing.wrongCount++;
+        existing.lastInput = userInput;
+        existing.dateTime = dateTime;
+    } else {
+        records.push({
+            book: bookName,
+            unit: selUnit,
+            correctWord: correctWord,
+            wrongInput: userInput,
+            lastInput: userInput,
+            wrongCount: 1,
+            dateTime: dateTime
+        });
+    }
+    localStorage.setItem('wrongWordRecords', JSON.stringify(records));
+}
+
+/* ---- 渲染错词记录表格 ---- */
+function renderWrongRecordTable() {
+    const records = getWrongRecords();
+    const wrap = document.getElementById('wrong-record-area');
+    if (!wrap) return;
+
+    if (records.length === 0) {
+        wrap.innerHTML = '<div class="empty-state"><div class="emoji">🎯</div><div class="text">暂无错词记录，继续保持！</div></div>';
+        return;
+    }
+
+    // 按错误次数降序
+    records.sort((a, b) => b.wrongCount - a.wrongCount);
+
+    wrap.innerHTML = `
+        <div class="wrong-record-toolbar">
+            <span class="wrong-record-info">📋 共 <strong>${records.length}</strong> 个错词记录</span>
+            <button class="btn btn-success" id="btn-download-records">⬇ 下载记录 (CSV)</button>
+            <button class="btn btn-ghost" id="btn-clear-records">🗑 清空记录</button>
+        </div>
+        <div class="table-scroll">
+            <table class="record-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>教材</th>
+                        <th>单元</th>
+                        <th>正确单词</th>
+                        <th>本次默写</th>
+                        <th>错误次数</th>
+                        <th>默写时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${records.map((r, i) => `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td>${esc(r.book || '')}</td>
+                            <td>${esc(r.unit || '')}</td>
+                            <td class="cell-correct">${esc(r.correctWord)}</td>
+                            <td class="cell-wrong">${esc(r.lastInput || '')}</td>
+                            <td class="cell-count">${r.wrongCount}</td>
+                            <td class="cell-date">${esc(r.dateTime || '')}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    document.getElementById('btn-download-records')?.addEventListener('click', downloadWrongRecords);
+    document.getElementById('btn-clear-records')?.addEventListener('click', () => {
+        if (confirm('确定要清空所有错词记录吗？此操作不可撤销。')) {
+            localStorage.removeItem('wrongWordRecords');
+            renderWrongRecordTable();
+            showToast('记录已清空');
+        }
+    });
+}
+
+/* ---- 下载CSV ---- */
+function downloadWrongRecords() {
+    const records = getWrongRecords();
+    if (records.length === 0) { showToast('暂无记录可下载'); return; }
+    records.sort((a, b) => b.wrongCount - a.wrongCount);
+    // UTF-8 BOM 防止 Excel 乱码
+    let csv = '\uFEFF序号,教材,单元,正确单词,本次默写输入,错误次数,默写时间\n';
+    records.forEach((r, i) => {
+        const row = [
+            i + 1,
+            r.book || '',
+            r.unit || '',
+            r.correctWord || '',
+            r.lastInput || '',
+            r.wrongCount,
+            r.dateTime || ''
+        ].map(field => {
+            const s = String(field).replace(/"/g, '""');
+            return `"${s}"`;
+        });
+        csv += row.join(',') + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    a.download = `错词记录_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('CSV 已下载');
+}
+
+// 初始渲染
+renderWordPreview();
+renderWrongRecordTable();

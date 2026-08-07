@@ -220,6 +220,11 @@
             <h2 class="page-title"><span class="accent"></span>英语单词背诵</h2>
             <div class="card">
                 <div class="word-header">
+                    <label style="font-weight:600;">教材：</label>
+                    <select id="book-select-words">
+                        <option value="textbook">课本（四年级上册）</option>
+                        <option value="nce1">新概念英语 第一册</option>
+                    </select>
                     <label style="font-weight:600;">选择单元：</label>
                     <select id="unit-select-words"></select>
                     <button class="btn btn-primary" id="start-study">开始背诵</button>
@@ -231,8 +236,15 @@
             <div id="word-area">
                 <div class="empty-state">
                     <div class="emoji">📖</div>
-                    <div class="text">选择单元并点击「开始背诵」</div>
+                    <div class="text">选择教材、单元，下方会预览本单元单词</div>
                 </div>
+            </div>
+
+            <!-- 错词记录 -->
+            <div class="card" style="margin-top:24px;">
+                <h3 class="section-title">📝 错词记录表</h3>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">每次默写中写错的单词会自动记录到这里，不清空浏览器缓存就不会丢失。</p>
+                <div id="wrong-record-area"></div>
             </div>
         </section>
     </main>
@@ -256,6 +268,7 @@
 
     <!-- ========== 数据文件 ========== -->
     <script src="data/word-data.js"></script>
+    <script src="data/nce1-data.js"></script>
     <script src="data/chinese-data.js"></script>
     <script src="data/math-data.js"></script>
     <script src="data/english-data.js"></script>
