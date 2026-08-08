@@ -142,6 +142,80 @@ if (sidebarOverlay) {
     sidebarOverlay.addEventListener('click', closeSidebar);
 }
 
+
+/* ================================================================
+ * 年级切换（4年级 ↔ 5年级）
+ * ================================================================ */
+let currentGrade = localStorage.getItem('currentGrade') || '4';
+let _activeChineseData, _activeMathData, _activeEnglishData, _activeWordData;
+
+function loadActiveData() {
+    if (currentGrade === '5') {
+        _activeChineseData = (typeof chineseData5 !== 'undefined') ? chineseData5 : chineseData;
+        _activeMathData    = (typeof mathData5 !== 'undefined') ? mathData5 : mathData;
+        _activeEnglishData = (typeof englishData5 !== 'undefined') ? englishData5 : englishData;
+        _activeWordData    = (typeof window.wordData5 !== 'undefined') ? window.wordData5 : window.wordData;
+    } else {
+        _activeChineseData = chineseData;
+        _activeMathData    = mathData;
+        _activeEnglishData = englishData;
+        _activeWordData    = window.wordData;
+    }
+}
+loadActiveData();
+
+function switchGrade(grade) {
+    if (grade === currentGrade) return;
+    currentGrade = grade;
+    localStorage.setItem('currentGrade', grade);
+    loadActiveData();
+
+    // 切换年级按钮状态
+    document.querySelectorAll('.grade-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.grade === grade);
+    });
+
+    // 重新填充所有下拉和内容
+    fillChineseUnits();
+    fillMathUnits();
+    fillEnglishUnits();
+    fillWordUnits();
+    renderChineseChars();
+    renderChinesePoints();
+    renderChineseSentences();
+    renderMathSummary();
+    renderMathExtension();
+    renderEnglishSummary();
+    renderEnglishSentences();
+    renderEnglishGrammar();
+    renderWordPreview();
+
+    // 更新首页学科卡片的描述
+    updateSubjectCards();
+
+    showToast(grade === '5' ? '已切换到五年级上册' : '已切换到四年级上册');
+}
+
+// 年级按钮绑定
+document.querySelectorAll('.grade-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchGrade(btn.dataset.grade));
+    if (btn.dataset.grade === currentGrade) btn.classList.add('active');
+    else btn.classList.remove('active');
+});
+
+// 更新首页学科卡片描述
+function updateSubjectCards() {
+    const descs = {
+        'chinese': currentGrade === '5' ? '8单元 · 24课' : '8单元 · 27课',
+    };
+    const card = document.querySelector('.subject-card[data-goto="page-chinese"] p:first-of-type');
+    if (card) card.textContent = descs.chinese;
+}
+// 初始化年级按钮
+document.querySelectorAll('.grade-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.grade === currentGrade);
+});
+
 /* ================================================================
  * 主导航菜单切换
  * ================================================================ */
@@ -272,10 +346,10 @@ document.querySelectorAll('.sub-tab').forEach(tab => {
 
 // 填充语文单元下拉
 function fillChineseUnits() {
-    const units = Object.keys(chineseData);
+    const units = Object.keys(_activeChineseData);
     ['chinese-unit-chars', 'chinese-unit-points', 'chinese-unit-sentences'].forEach(id => {
         const sel = document.getElementById(id);
-        sel.innerHTML = units.map(u => `<option value="${esc(u)}">${esc(u)} · ${esc(chineseData[u].theme)}</option>`).join('');
+        sel.innerHTML = units.map(u => `<option value="${esc(u)}">${esc(u)} · ${esc(_activeChineseData[u].theme)}</option>`).join('');
     });
 }
 fillChineseUnits();
@@ -283,7 +357,7 @@ fillChineseUnits();
 // 渲染生字词
 function renderChineseChars() {
     const unit = document.getElementById('chinese-unit-chars').value;
-    const data = chineseData[unit];
+    const data = _activeChineseData[unit];
     const display = document.getElementById('chinese-chars-display');
     if (!data) { display.innerHTML = '<div class="empty-state"><div class="emoji">📝</div><div class="text">暂无数据</div></div>'; return; }
 
@@ -307,7 +381,7 @@ function renderChineseChars() {
 // 打印默写纸
 function showPrintSheet() {
     const unit = document.getElementById('chinese-unit-chars').value;
-    const data = chineseData[unit];
+    const data = _activeChineseData[unit];
     if (!data) return;
 
     let allChars = [];
@@ -334,7 +408,7 @@ function showPrintSheet() {
 // 渲染重点讲解
 function renderChinesePoints() {
     const unit = document.getElementById('chinese-unit-points').value;
-    const data = chineseData[unit];
+    const data = _activeChineseData[unit];
     const display = document.getElementById('chinese-points-display');
     if (!data) { display.innerHTML = ''; return; }
 
@@ -351,7 +425,7 @@ function renderChinesePoints() {
 // 渲染仿写造句
 function renderChineseSentences() {
     const unit = document.getElementById('chinese-unit-sentences').value;
-    const data = chineseData[unit];
+    const data = _activeChineseData[unit];
     const display = document.getElementById('chinese-sentences-display');
     if (!data) { display.innerHTML = ''; return; }
 
@@ -388,7 +462,7 @@ renderChineseSentences();
  * 数学模块
  * ================================================================ */
 function fillMathUnits() {
-    const units = Object.keys(mathData);
+    const units = Object.keys(_activeMathData);
     ['math-unit-summary', 'math-unit-extension'].forEach(id => {
         const sel = document.getElementById(id);
         sel.innerHTML = units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
@@ -398,7 +472,7 @@ fillMathUnits();
 
 function renderMathSummary() {
     const unit = document.getElementById('math-unit-summary').value;
-    const data = mathData[unit];
+    const data = _activeMathData[unit];
     const display = document.getElementById('math-summary-display');
     if (!data) { display.innerHTML = ''; return; }
 
@@ -412,7 +486,7 @@ function renderMathSummary() {
 
 function renderMathExtension() {
     const unit = document.getElementById('math-unit-extension').value;
-    const data = mathData[unit];
+    const data = _activeMathData[unit];
     const display = document.getElementById('math-extension-display');
     if (!data) { display.innerHTML = ''; return; }
 
@@ -436,11 +510,11 @@ renderMathExtension();
  * 英语模块
  * ================================================================ */
 function fillEnglishUnits() {
-    const units = Object.keys(englishData);
+    const units = Object.keys(_activeEnglishData);
     ['english-unit-summary', 'english-unit-sentences', 'english-unit-grammar'].forEach(id => {
         const sel = document.getElementById(id);
         sel.innerHTML = units.map(u => {
-            const title = englishData[u].title ? ` (${englishData[u].title})` : '';
+            const title = _activeEnglishData[u].title ? ` (${_activeEnglishData[u].title})` : '';
             return `<option value="${esc(u)}">${esc(u)}${esc(title)}</option>`;
         }).join('');
     });
@@ -449,7 +523,7 @@ fillEnglishUnits();
 
 function renderEnglishSummary() {
     const unit = document.getElementById('english-unit-summary').value;
-    const data = englishData[unit];
+    const data = _activeEnglishData[unit];
     const display = document.getElementById('english-summary-display');
     if (!data) { display.innerHTML = ''; return; }
 
@@ -463,7 +537,7 @@ function renderEnglishSummary() {
 
 function renderEnglishSentences() {
     const unit = document.getElementById('english-unit-sentences').value;
-    const data = englishData[unit];
+    const data = _activeEnglishData[unit];
     const display = document.getElementById('english-sentences-display');
     if (!data) { display.innerHTML = ''; return; }
 
@@ -482,7 +556,7 @@ function renderEnglishSentences() {
 
 function renderEnglishGrammar() {
     const unit = document.getElementById('english-unit-grammar').value;
-    const data = englishData[unit];
+    const data = _activeEnglishData[unit];
     const display = document.getElementById('english-grammar-display');
     if (!data) { display.innerHTML = ''; return; }
 
@@ -561,7 +635,7 @@ function renderSentenceModule() {
  * ================================================================ */
 const nce1Data = (typeof window.nce1Data !== 'undefined') ? window.nce1Data : [];
 const primary1000Data = (typeof window.primary1000Data !== 'undefined') ? window.primary1000Data : [];
-const wordData = (typeof window.wordData !== 'undefined') ? window.wordData : [];
+// _activeWordData 已在年级切换模块定义，此处不重复声明
 
 // 当前教材数据集
 function getCurrentWordBook() {
@@ -569,7 +643,7 @@ function getCurrentWordBook() {
     const book = bookSel ? bookSel.value : 'textbook';
     if (book === 'nce1' && nce1Data.length) return nce1Data;
     if (book === 'primary1000' && primary1000Data.length) return primary1000Data;
-    return wordData;
+    return _activeWordData;
 }
 
 // 根据教材填充单元下拉
