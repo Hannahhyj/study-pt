@@ -32,6 +32,36 @@ function speakText(text, lang = 'en-US', rate = 0.9) {
 
 
 /* ================================================================
+ * 侧边栏遮罩交互
+ * ================================================================ */
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    if (sidebarOverlay) sidebarOverlay.classList.add('active');
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+}
+
+// 移动端菜单切换
+document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar.classList.contains('open')) {
+        closeSidebar();
+    } else {
+        openSidebar();
+    }
+});
+
+// 点击遮罩关闭侧边栏
+if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeSidebar);
+}
+
+/* ================================================================
  * 主导航菜单切换
  * ================================================================ */
 function switchPage(pageId) {
@@ -43,7 +73,7 @@ function switchPage(pageId) {
     if (pageId === 'page-sentence') renderSentenceModule();
 
     // 移动端关闭菜单
-    document.getElementById('sidebar').classList.remove('open');
+    closeSidebar();
 }
 
 document.querySelectorAll('.menu-item').forEach(item => {
@@ -53,11 +83,6 @@ document.querySelectorAll('.menu-item').forEach(item => {
 // 首页学科卡片点击跳转
 document.querySelectorAll('.subject-card').forEach(card => {
     card.addEventListener('click', () => switchPage(card.dataset.goto));
-});
-
-// 移动端菜单切换
-document.getElementById('mobileMenuToggle')?.addEventListener('click', () => {
-    document.getElementById('sidebar').classList.toggle('open');
 });
 
 
@@ -790,3 +815,133 @@ function downloadWrongRecords() {
 // 初始渲染
 renderWordPreview();
 renderWrongRecordTable();
+
+
+/* ================================================================
+ * 自定义下拉选择器（支持长选项列表滚动选择）
+ * ================================================================ */
+class CustomSelect {
+    constructor(selectEl) {
+        this.select = selectEl;
+        this.isOpen = false;
+
+        // 创建包装器
+        this.wrapper = document.createElement('div');
+        this.wrapper.className = 'custom-select';
+
+        // 创建触发按钮
+        this.trigger = document.createElement('div');
+        this.trigger.className = 'custom-select-trigger';
+        this.trigger.textContent = this._getSelectedText();
+
+        // 创建选项面板
+        this.optionsPanel = document.createElement('div');
+        this.optionsPanel.className = 'custom-select-options';
+        this._buildOptions();
+
+        // 插入 DOM：把 select 包裹进 wrapper
+        this.select.parentNode.insertBefore(this.wrapper, this.select);
+        this.wrapper.appendChild(this.trigger);
+        this.wrapper.appendChild(this.optionsPanel);
+        this.select.style.display = 'none';
+        this.wrapper.appendChild(this.select);
+
+        // 点击触发器开关
+        this.trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggle();
+        });
+
+        // 点击外部关闭
+        document.addEventListener('click', (e) => {
+            if (!this.wrapper.contains(e.target)) this.close();
+        });
+
+        // 触摸滑动关闭（防止穿透）
+        document.addEventListener('touchstart', (e) => {
+            if (this.isOpen && !this.wrapper.contains(e.target)) this.close();
+        }, { passive: true });
+
+        // 监听原生 select change（外部程序更新值时同步）
+        this.select.addEventListener('change', () => {
+            this.trigger.textContent = this._getSelectedText();
+            this._buildOptions();
+        });
+
+        // MutationObserver 监听子元素变化（动态更新选项时同步）
+        this._observer = new MutationObserver(() => {
+            this._buildOptions();
+            this.trigger.textContent = this._getSelectedText();
+        });
+        this._observer.observe(this.select, { childList: true });
+    }
+
+    _getSelectedText() {
+        const opt = this.select.options[this.select.selectedIndex];
+        return opt ? opt.textContent : '';
+    }
+
+    _buildOptions() {
+        this.optionsPanel.innerHTML = '';
+        Array.from(this.select.options).forEach(opt => {
+            const el = document.createElement('div');
+            el.className = 'custom-select-option' + (opt.selected ? ' selected' : '');
+            el.textContent = opt.textContent;
+            el.dataset.value = opt.value;
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._selectOption(opt.value);
+            });
+            this.optionsPanel.appendChild(el);
+        });
+    }
+
+    toggle() {
+        this.isOpen ? this.close() : this.open();
+    }
+
+    open() {
+        // 先关闭其他已打开的下拉
+        document.querySelectorAll('.custom-select.open').forEach(el => el.classList.remove('open'));
+        this.wrapper.classList.add('open');
+        this.isOpen = true;
+
+        // 检查底部空间，空间不足则上弹
+        const rect = this.wrapper.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        if (spaceBelow < 250 && rect.top > 250) {
+            this.wrapper.classList.add('dropup');
+        } else {
+            this.wrapper.classList.remove('dropup');
+        }
+
+        // 滚动到选中项
+        const sel = this.optionsPanel.querySelector('.selected');
+        if (sel) sel.scrollIntoView({ block: 'nearest' });
+    }
+
+    close() {
+        this.wrapper.classList.remove('open', 'dropup');
+        this.isOpen = false;
+    }
+
+    _selectOption(value) {
+        this.select.value = value;
+        this.select.dispatchEvent(new Event('change'));
+        this.trigger.textContent = this._getSelectedText();
+        this._buildOptions();
+        this.close();
+    }
+}
+
+// 初始化所有自定义下拉
+function initCustomSelects() {
+    document.querySelectorAll('select').forEach(sel => {
+        if (!sel.closest('.custom-select')) {
+            new CustomSelect(sel);
+        }
+    });
+}
+
+// 等所有选项填充完毕后初始化
+initCustomSelects();
