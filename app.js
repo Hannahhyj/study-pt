@@ -21,13 +21,94 @@ function getTodayStr() {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+/* ================================================================
+ * 语音朗读（Web Speech API）
+ * 关键修复：保持用户手势上下文、Chrome cancel+speak 兼容、长文本保活
+ * ================================================================ */
+let _speakTimer = null;   // 保活定时器
+let _isSpeaking = false;  // 朗读状态标记
+
+function getVoiceForLang(lang) {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    const langLower = lang.toLowerCase();
+    const prefix = langLower.split('-')[0];
+    // 1. 精确匹配
+    let match = voices.find(v => v.lang.toLowerCase() === langLower);
+    // 2. 前缀匹配
+    if (!match) match = voices.find(v => v.lang.toLowerCase().startsWith(prefix));
+    // 3. 英语兜底：优先选不包含 "Premium" 的本地语音
+    if (!match && prefix === 'en') {
+        match = voices.find(v => v.lang.toLowerCase().startsWith('en') && v.localService && !v.name.includes('Premium'));
+    }
+    return match || null;
+}
+
 function speakText(text, lang = 'en-US', rate = 0.9) {
     if (!('speechSynthesis' in window)) { showToast('当前浏览器不支持语音朗读'); return; }
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
+
+    // 清理上一次的保活定时器
+    if (_speakTimer) { clearInterval(_speakTimer); _speakTimer = null; }
+
+    // 朗读文本清理：去除 HTML 标签和残留的 HTML 实体
+    const cleanText = text.replace(/<[^>]*>/g, '')
+                          .replace(/&amp;/gi, '&')
+                          .replace(/&lt;/gi, '<')
+                          .replace(/&gt;/gi, '>')
+                          .replace(/&quot;/gi, '"')
+                          .replace(/&#39;/gi, "'")
+                          .replace(/&nbsp;/gi, ' ')
+                          .trim();
+    if (!cleanText) { showToast('朗读内容为空'); return; }
+
+    // 如果正在朗读，先取消（必须在 speak 之前同步 cancel）
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+    }
+
+    const utter = new SpeechSynthesisUtterance(cleanText);
     utter.lang = lang;
     utter.rate = rate;
+    utter.volume = 1;
+
+    // 匹配语音
+    const voice = getVoiceForLang(lang);
+    if (voice) utter.voice = voice;
+
+    // 朗读状态 + Chrome 长文本保活
+    utter.onstart = () => {
+        _isSpeaking = true;
+        if (_speakTimer) clearInterval(_speakTimer);
+        _speakTimer = setInterval(() => {
+            if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+                window.speechSynthesis.pause();
+                window.speechSynthesis.resume();
+            }
+        }, 10000);
+    };
+    utter.onend = () => {
+        _isSpeaking = false;
+        if (_speakTimer) { clearInterval(_speakTimer); _speakTimer = null; }
+    };
+    utter.onerror = (e) => {
+        _isSpeaking = false;
+        if (_speakTimer) { clearInterval(_speakTimer); _speakTimer = null; }
+        if (e.error !== 'interrupted' && e.error !== 'canceled') {
+            console.warn('语音朗读错误:', e.error, '| 文本:', cleanText);
+        }
+    };
+
+    // 关键：必须同步调用 speak()，保持用户手势上下文（移动端必须）
+    // Chrome 的 cancel+speak 静默问题已通过"仅在 speaking 时才 cancel"缓解
     window.speechSynthesis.speak(utter);
+}
+
+// 预加载语音列表（Chrome 异步加载，需监听 voiceschanged）
+if ('speechSynthesis' in window) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', () => {
+        window.speechSynthesis.getVoices();
+    });
 }
 
 
@@ -386,14 +467,16 @@ function renderEnglishSentences() {
     const display = document.getElementById('english-sentences-display');
     if (!data) { display.innerHTML = ''; return; }
 
-    display.innerHTML = (data.keySentences || []).map(s => `
+    const sentences = data.keySentences || [];
+    display.innerHTML = sentences.map((s, i) => `
         <div class="en-sentence-card">
             <span class="en-text">${esc(s)}</span>
-            <button class="btn-read-small" data-audio="${esc(s)}">🔊 朗读</button>
+            <button class="btn-read-small" data-idx="${i}">🔊 朗读</button>
         </div>
     `).join('');
-    display.querySelectorAll('[data-audio]').forEach(btn => {
-        btn.onclick = () => speakText(btn.dataset.audio);
+    display.querySelectorAll('.btn-read-small').forEach(btn => {
+        const idx = parseInt(btn.dataset.idx);
+        btn.onclick = () => speakText(sentences[idx]);
     });
 }
 
@@ -445,23 +528,30 @@ function renderSentenceModule() {
 
     document.getElementById('dateInfo').textContent = `📅 ${todayStr} · 每日自动更换`;
     const sBox = document.getElementById('sentenceBox');
-    sBox.innerHTML = todayData.sentences.map((item, i) => `
+    const sentences = todayData.sentences;
+    sBox.innerHTML = sentences.map((item, i) => `
         <div class="sentence-card-box">
             <div class="sentence-text">${i + 1}. ${esc(item.text)}</div>
             <div class="sentence-source">—— ${esc(item.source)}</div>
-            <button class="btn-read-small" data-audio="${esc(item.text)}">🔊 朗读</button>
+            <button class="btn-read-small" data-sidx="${i}">🔊 朗读</button>
         </div>
     `).join('');
+    sBox.querySelectorAll('.btn-read-small').forEach(btn => {
+        const idx = parseInt(btn.dataset.sidx);
+        btn.onclick = () => speakText(sentences[idx].text);
+    });
     const wBox = document.getElementById('wordBox');
-    wBox.innerHTML = todayData.goodWords.map(item => `
+    const goodWords = todayData.goodWords;
+    wBox.innerHTML = goodWords.map((item, i) => `
         <div class="word-item-box">
             <span class="word-en">${esc(item.word)}</span>
             <span class="word-example">${esc(item.example)}</span>
-            <button class="btn-read-small" data-audio="${esc(item.example)}">🔊 朗读</button>
+            <button class="btn-read-small" data-widx="${i}">🔊 朗读</button>
         </div>
     `).join('');
-    document.querySelectorAll('[data-audio]').forEach(btn => {
-        btn.onclick = () => speakText(btn.dataset.audio);
+    wBox.querySelectorAll('.btn-read-small').forEach(btn => {
+        const idx = parseInt(btn.dataset.widx);
+        btn.onclick = () => speakText(goodWords[idx].example);
     });
 }
 
